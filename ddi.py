@@ -93,7 +93,7 @@ Y = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
 #converted to one hot vector
 Y = [to_categorical(i, num_classes=n_tags) for i in Y]
 
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5)
 
 input = Input(shape=(100,))
 model = Embedding(input_dim=n_words, output_dim=100, input_length=100)(input)
@@ -102,7 +102,7 @@ model = Bidirectional(LSTM(units=100, return_sequences=True, recurrent_dropout=0
 out = TimeDistributed(Dense(n_tags, activation="softmax"))(model)  # softmax output layer
 model = Model(input, out)
 model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-history = model.fit(X_train, np.array(Y_train), batch_size=32, epochs=1, validation_split=0.2, verbose=1)
+history = model.fit(X_train, np.array(Y_train), batch_size=32, epochs=25, validation_split=0.1, verbose=1)
 
 i = 0
 p = model.predict(np.array([X_test[i]]))
@@ -110,3 +110,21 @@ p = np.argmax(p, axis=-1)
 print("{:15} ({:5}): {}".format("Word", "True", "Pred"))
 for w,pred in zip(X_test[i],p[0]):
     print("{:15}: {}".format(words[w],tags[pred]))
+
+acc = history.history['acc']
+val_acc = history.history['val_acc']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+epochs = range(1, len(acc) + 1)
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+plt.figure()
+
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+plt.show()
