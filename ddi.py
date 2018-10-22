@@ -11,6 +11,7 @@ from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from keras.models import Model, Input
 from keras.layers import LSTM, Embedding, Dense, TimeDistributed, Dropout, Bidirectional
+from seqeval.metrics import classification_report
 
 csv_list = []
 file_counter = 0
@@ -93,7 +94,7 @@ Y = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
 #converted to one hot vector
 Y = [to_categorical(i, num_classes=n_tags) for i in Y]
 
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5)
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
 
 input = Input(shape=(100,))
 model = Embedding(input_dim=n_words, output_dim=100, input_length=100)(input)
@@ -128,3 +129,9 @@ plt.plot(epochs, val_loss, 'b', label='Validation loss')
 plt.title('Training and validation loss')
 plt.legend()
 plt.show()
+
+test_pred = model.predict(X_test, verbose=1)
+idx2tag = {i: w for w, i in tag2idx.items()}
+pred_labels = pred2label(test_pred, idx2tag)
+test_labels = pred2label(Y_test, idx2tag)
+print(classification_report(test_labels, pred_labels))
