@@ -8,7 +8,7 @@
 
 
 
-#     # for word in sentenceText.text:
+    # for word in sentenceText.text:
 # with open('data.csv', 'w') as fileObj:
 #     wr = csv.writer(fileObj, quoting=csv.QUOTE_ALL)
 #     wr.writerow(['filenumber', 'sentence_idx', 'word', 'pos', 'tag'])
@@ -33,3 +33,13 @@
     # plt.legend()
     # plt.show()
 
+# scikit-learn k-fold cross-validation
+from numpy import array
+from sklearn.model_selection import KFold
+# data sample
+data = array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+# prepare cross validation
+kfold = KFold(3, True, 1)
+# enumerate splits
+for train, test in kfold.split(data):
+	print('train: %s, test: %s' % (data[train], data[test]))
