@@ -39,10 +39,12 @@ def pred2label(pred):
             out_i.append(idx2tag[p_i].replace("PAD", "O"))
         out.append(out_i)
     return out
+
 sentence_file_dict = {}
 sentence_all_dic = []
 mypath = Path().absolute()
 path = str(mypath) + '/trainingFiles'
+
 for filename in os.listdir(path):
     sentence_all_dic = []
     if not filename.endswith('.xml'): continue
@@ -89,16 +91,9 @@ for filename in os.listdir(path):
             snt_temp = sentence_ind
     sentence_file_dict[file_counter] = sentence_all_dic
 
-
-
-
-
 # train word2vec model
 w2vmodel = Word2Vec(sentence_all, min_count=1)
-# summarize the loaded model
-# print(w2vmodel)
 
-# words = list(set(word_list))
 words =[]
 for word_in_word_list in word_list:
     if word_in_word_list not in words:
@@ -122,7 +117,6 @@ tag2idx = {t: i for i, t in enumerate(tags)}
 # lenght of X is the no of sentences
 X = [[word2idx[w[0]] for w in s] for s in sentence_list]
 
-
 # pad all sentences with ENDPAD "O"
 X = pad_sequences(maxlen=100, sequences=X, padding="post", value = unique_words - 1)
 
@@ -134,8 +128,12 @@ Y = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
 
 from sklearn.model_selection import KFold
 
-kf = KFold(n_splits=5,shuffle=False)
+# # ----------------------------------------------------------------------------------------------------------------------
 
+# # code for kfold with with shuffling
+# # ** Please comment this block of code for running K Fold without shuffling between the horizontal lines below
+# kf = KFold(n_splits=5,shuffle=True)
+#
 # for train_index, test_index in kf.split(X):
 #
 #     X_train = X[train_index]
@@ -147,13 +145,16 @@ kf = KFold(n_splits=5,shuffle=False)
 #     Y_test = Y[test_index]
 #     Y_test.tolist()
 
-# code for kfold without without shuffling
+# # ----------------------------------------------------------------------------------------------------------------------
+
+# code for kfold without  shuffling
+# ** Please comment this block of code for running K Fold with shuffling between the horizontal lines above
 data = []
 for i in range(1,22+1):
     data.append(i)
 
 data = np.asarray(data)
-
+kf = KFold(n_splits=5,shuffle=False)
 for train, test in kf.split(data):
     # print('train: %s, test: %s' % (data[train], data[test]))
 
@@ -177,7 +178,7 @@ for train, test in kf.split(data):
     Y_test = [[tag2idx[w[2]] for w in s] for s in new_sentence_list_test]
     Y_test = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
 
-
+# # ----------------------------------------------------------------------------------------------------------------------
 
     # converted to one hot vector
     Y_train  = [to_categorical(i, num_classes=n_tags) for i in Y_train]
@@ -199,6 +200,10 @@ for train, test in kf.split(data):
     # model.summary()
     history = model.fit(X_train, np.array(Y_train), batch_size=32, epochs=30, validation_split=0.1, verbose=1)
 
+# # ----------------------------------------------------------------------------------------------------------------------
+
+    # # to show the tagging for one sentence
+
     # i = 0
     # p = model.predict(np.array([X_test[i]]))
     # p = np.argmax(p, axis=-1)
@@ -206,6 +211,8 @@ for train, test in kf.split(data):
     # for w, pred in zip(X_test[i], p[0]):
     #     if words[w] != "ENDPAD":
     #         print("{:15}: {}".format(words[w], tags[pred]))
+
+    # # This is the code to plot the graph with validation, loss and accuracy
 
     # acc = history.history['acc']
     # val_acc = history.history['val_acc']
@@ -224,6 +231,7 @@ for train, test in kf.split(data):
     # plt.title('Training and validation loss')
     # plt.legend()
     # plt.show()
+# # ----------------------------------------------------------------------------------------------------------------------
 
     test_pred = model.predict(X_test, verbose=1)
     idx2tag = {}
@@ -231,16 +239,10 @@ for train, test in kf.split(data):
 
     pred_labels = pred2label(test_pred)
     test_labels = pred2label(Y_test)
-    print(classification_report(test_labels, pred_labels))
+    # print(classification_report(test_labels, pred_labels))
     pred_label_list += pred_labels
     test_label_list += test_labels
 
 
 print(classification_report(test_label_list, pred_label_list))
 
-# with open('eval.csv', 'w') as fileObj:
-#     wr = csv.writer(fileObj, quoting=csv.QUOTE_ALL)
-#     wr.writerow(['Actual', 'Predicted'])
-#     for actual, predict in zip(test_label_list, pred_label_list):
-#         row = [actual, predict]
-#         wr.writerow(row)
