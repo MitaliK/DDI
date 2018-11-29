@@ -14,6 +14,8 @@ from sklearn.model_selection import train_test_split
 from gensim.models import Word2Vec
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
 from pathlib import Path
 
 csv_list = []
@@ -26,6 +28,7 @@ EMBEDDING_DIM = 100
 idx2tag ={}
 pred_label_list = []
 test_label_list = []
+unique_sentence = []
 
 def pred2label(pred):
     out = []
@@ -36,10 +39,12 @@ def pred2label(pred):
             out_i.append(idx2tag[p_i].replace("PAD", "O"))
         out.append(out_i)
     return out
-
+sentence_file_dict = {}
+sentence_all_dic = []
 mypath = Path().absolute()
 path = str(mypath) + '/trainingFiles'
 for filename in os.listdir(path):
+    sentence_all_dic = []
     if not filename.endswith('.xml'): continue
     fullname = os.path.join(path, filename)
     tree = ET.parse(fullname)
@@ -49,35 +54,44 @@ for filename in os.listdir(path):
         if child.tag == 'Sentences':
             sentences = child
             break
-
+    snt_temp = 0
     for sentence_ind, sentence in enumerate(sentences.findall('Sentence')):
         sentenceText = sentence.find('SentenceText').text
-        # print(nltk.pos_tag(nltk.word_tokenize(sentenceText)))
-        tag_dict = {}
-        for mention in sentence.findall('Mention'):
-            for mentiounique_words in mention.attrib['str'].split('|'):
-                for ind, mention_word in enumerate(mentiounique_words.split()):
-                    if not ind:
-                        tag_dict[mention_word] = 'B-' + mention.attrib['type']
-                    else:
-                        tag_dict[mention_word] = 'I-' + mention.attrib['type']
+        if sentenceText not in unique_sentence:
+            unique_sentence.append(sentenceText)
+            # print(nltk.pos_tag(nltk.word_tokenize(sentenceText)))
+            tag_dict = {}
+            for mention in sentence.findall('Mention'):
+                for mentiounique_words in mention.attrib['str'].split('|'):
+                    for ind, mention_word in enumerate(mentiounique_words.split()):
+                        if not ind:
+                            tag_dict[mention_word] = 'B-' + mention.attrib['type']
+                        else:
+                            tag_dict[mention_word] = 'I-' + mention.attrib['type']
 
-        temp_list = []
-        sentence_each = []
-        for word_tag in nltk.pos_tag(nltk.word_tokenize(sentenceText)):
-            tag = 'O'
-            word = word_tag[0]
-            pos = word_tag[1]
-            if word in tag_dict:
-                tag = tag_dict[word]
-            csv_list.append([file_counter, sentence_ind, word, pos, tag])
+            temp_list = []
+            sentence_each = []
+            for word_tag in nltk.pos_tag(nltk.word_tokenize(sentenceText)):
+                tag = 'O'
+                word = word_tag[0]
+                pos = word_tag[1]
+                if word in tag_dict:
+                    tag = tag_dict[word]
+                csv_list.append([file_counter, sentence_ind, word, pos, tag])
 
-            word_list.append(word)
-            tag_list.append(tag)
-            sentence_each.append(word)
-            temp_list.append((word, pos, tag))
-        sentence_list.append(temp_list)
-        sentence_all.append(sentence_each)
+                word_list.append(word)
+                tag_list.append(tag)
+                sentence_each.append(word)
+                temp_list.append((word, pos, tag))
+            sentence_list.append(temp_list)
+            sentence_all.append(sentence_each)
+            sentence_all_dic.append(temp_list)
+            snt_temp = sentence_ind
+    sentence_file_dict[file_counter] = sentence_all_dic
+
+
+
+
 
 # train word2vec model
 w2vmodel = Word2Vec(sentence_all, min_count=1)
@@ -108,6 +122,7 @@ tag2idx = {t: i for i, t in enumerate(tags)}
 # lenght of X is the no of sentences
 X = [[word2idx[w[0]] for w in s] for s in sentence_list]
 
+
 # pad all sentences with ENDPAD "O"
 X = pad_sequences(maxlen=100, sequences=X, padding="post", value = unique_words - 1)
 
@@ -119,24 +134,50 @@ Y = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
 
 from sklearn.model_selection import KFold
 
-kf = KFold(n_splits=5,shuffle=True)
-# kf.get_n_splits(X,Y)
-for train_index, test_index in kf.split(X):
+kf = KFold(n_splits=5,shuffle=False)
 
-    X_train = X[train_index]
-    X_train.tolist()
-    X_test = X[test_index]
-    X_test.tolist()
-    Y_train = Y[train_index]
-    Y_train.tolist()
-    Y_test = Y[test_index]
-    Y_test.tolist()
-    # for i in train_index:
-    #     X_train.append(X[i])
-    #     Y_train.append(Y[i])
-    # for j in test_index:
-    #     X_test.append(X[i])
-    #     Y_test.append(Y[i])
+# for train_index, test_index in kf.split(X):
+#
+#     X_train = X[train_index]
+#     X_train.tolist()
+#     X_test = X[test_index]
+#     X_test.tolist()
+#     Y_train = Y[train_index]
+#     Y_train.tolist()
+#     Y_test = Y[test_index]
+#     Y_test.tolist()
+
+# code for kfold without without shuffling
+data = []
+for i in range(1,22+1):
+    data.append(i)
+
+data = np.asarray(data)
+
+for train, test in kf.split(data):
+    # print('train: %s, test: %s' % (data[train], data[test]))
+
+    new_sentence_list_train = []
+    for i in data[train]:
+        new_sentence_list_train += sentence_file_dict[i]
+    # print(len(new_sentence_list_train))
+
+    X_train = [[word2idx[w[0]] for w in s] for s in new_sentence_list_train]
+    X_train = pad_sequences(maxlen=100, sequences=X, padding="post", value=unique_words - 1)
+    Y_train = [[tag2idx[w[2]] for w in s] for s in new_sentence_list_train]
+    Y_train = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
+
+    new_sentence_list_test = []
+    for j in data[test]:
+        new_sentence_list_test += sentence_file_dict[j]
+    # print(len(new_sentence_list_test))
+
+    X_test = [[word2idx[w[0]] for w in s] for s in new_sentence_list_test]
+    X_test = pad_sequences(maxlen=100, sequences=X, padding="post", value=unique_words - 1)
+    Y_test = [[tag2idx[w[2]] for w in s] for s in new_sentence_list_test]
+    Y_test = pad_sequences(maxlen=100, sequences=Y, padding="post", value=tag2idx["O"])
+
+
 
     # converted to one hot vector
     Y_train  = [to_categorical(i, num_classes=n_tags) for i in Y_train]
@@ -148,14 +189,14 @@ for train_index, test_index in kf.split(X):
     input = Input(shape=(100,))
     # model = Embedding(input_dim = unique_words, output_dim=EMBEDDING_DIM, input_length=100)(input)
     model = Embedding(input_dim = unique_words, output_dim=EMBEDDING_DIM, weights = [embedding_matrix], input_length=100)(input)
-    print(model)
+    # print(model)
     model = Dropout(0.1)(model)
     model = Bidirectional(LSTM(units=100, return_sequences=True, recurrent_dropout=0.1))(model)
     out = TimeDistributed(Dense(n_tags, activation="softmax"))(model)
     model = Model(input, out)
     # plot_model(model, to_file = 'model.png', show_shapes=True)
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-    model.summary()
+    # model.summary()
     history = model.fit(X_train, np.array(Y_train), batch_size=32, epochs=30, validation_split=0.1, verbose=1)
 
     # i = 0
@@ -190,10 +231,16 @@ for train_index, test_index in kf.split(X):
 
     pred_labels = pred2label(test_pred)
     test_labels = pred2label(Y_test)
+    print(classification_report(test_labels, pred_labels))
     pred_label_list += pred_labels
     test_label_list += test_labels
 
 
 print(classification_report(test_label_list, pred_label_list))
 
-
+# with open('eval.csv', 'w') as fileObj:
+#     wr = csv.writer(fileObj, quoting=csv.QUOTE_ALL)
+#     wr.writerow(['Actual', 'Predicted'])
+#     for actual, predict in zip(test_label_list, pred_label_list):
+#         row = [actual, predict]
+#         wr.writerow(row)
